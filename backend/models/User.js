@@ -1,6 +1,18 @@
 const db = require('../config/db');
 
 class User {
+    // ----------------------------------------------------
+    // เพิ่มฟังก์ชันใหม่ตรงนี้: สำหรับดึงข้อมูลผู้ใช้ทั้งหมด
+    // ----------------------------------------------------
+    static async findAll() {
+        // นำคำสั่ง SQL มาไว้ที่นี่แทน
+        const sql = `SELECT user_id, email, name, is_verified, status, created_at FROM user`;
+        const [rows] = await db.execute(sql);
+        return rows;
+    }
+}
+
+class newUser {
     // สร้างผู้ใช้ใหม่
     static async create(userData) {
         const { user_id, email, password_hash, name, is_verified, status } = userData;
@@ -24,4 +36,4 @@ class User {
     }
 }
 
-module.exports = User;
+module.exports = User,newUser;
