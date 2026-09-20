@@ -1,31 +1,3 @@
-/*const db = require('../config/db');
-// ดึงข้อมูล Sensor ทั้งหมด
-exports.getAllNodes = async (req, res) => {
-    try {
-        const [rows] = await db.query('SELECT * FROM user');
-        res.status(200).json(rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-};
-// เพิ่ม Sensor ใหม่
-exports.createNode = async (req, res) => {
-    const { Node_Name, Installation_Date, Location_ID } = req.body;
-    try {
-        const sql = `INSERT INTO user (Node_Name, Installation_Date, Location_ID)
-            VALUES (?, ?, ?)`;
-        const [result] = await db.execute(sql, [Node_Name, Installation_Date, Location_ID]);
-
-        res.status(201).json({
-            message: 'Node Created',
-            id: result.insertId
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-        };
-*/
-
 const db = require('../config/db');
 
 // ดึงข้อมูลผู้ใช้ทั้งหมด
