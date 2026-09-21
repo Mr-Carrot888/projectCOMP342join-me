@@ -21,6 +21,20 @@ class Request {
         const [rows] = await db.execute(sql, [postId]);
         return rows;
     }
+
+    // ดึงคำขอตาม request_id
+    static async findById(requestId) {
+        const sql = `SELECT * FROM connection_request WHERE request_id = ?`;
+        const [rows] = await db.execute(sql, [requestId]);
+        return rows[0];
+    }
+
+    // ค้นหาว่าเคยส่งคำขอในโพสต์นี้ไปหรือยัง
+    static async findByPostAndSender(postId, senderId) {
+        const sql = `SELECT * FROM connection_request WHERE post_id = ? AND sender_id = ?`;
+        const [rows] = await db.execute(sql, [postId, senderId]);
+        return rows[0];
+    }
 }
 
 module.exports = Request;
