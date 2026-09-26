@@ -10,16 +10,18 @@ class User {
 
     // 2. สร้างผู้ใช้ใหม่ (สมัครสมาชิก)
     static async create(userData) {
-        const { user_id, email, password_hash, name, is_verified, status } = userData;
-        const sql = `INSERT INTO user (user_id, email, password_hash, name, is_verified, status)
-                     VALUES (?, ?, ?, ?, ?, ?)`;
+        const { user_id, email, password_hash, name, is_verified, status, verification_token, token_expires_at } = userData;
+        const sql = `INSERT INTO user (user_id, email, password_hash, name, is_verified, status, verification_token, token_expires_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const [result] = await db.execute(sql, [
             user_id, 
             email, 
             password_hash, 
             name, 
             is_verified || 0, 
-            status || 'Active'
+            status || 'Active',
+            verification_token || null,
+            token_expires_at || null
         ]);
         return result;
     }
@@ -36,6 +38,27 @@ class User {
         const sql = `SELECT * FROM user WHERE user_id = ?`;
         const [rows] = await db.execute(sql, [userId]);
         return rows[0];
+    }
+
+    // 5. บันทึก Token ยืนยันอีเมลและวันหมดอายุ (15 นาที)
+    static async setVerificationToken(userId, token, expiresAt) {
+        const sql = `UPDATE user SET verification_token = ?, token_expires_at = ? WHERE user_id = ?`;
+        const [result] = await db.execute(sql, [token, expiresAt, userId]);
+        return result;
+    }
+
+    // 6. ค้นหาผู้ใช้ด้วย Token ยืนยันอีเมล (สำหรับ Verify Email)
+    static async findByVerificationToken(token) {
+        const sql = `SELECT * FROM user WHERE verification_token = ?`;
+        const [rows] = await db.execute(sql, [token]);
+        return rows[0];
+    }
+
+    // 7. ยืนยันอีเมลสำเร็จ (is_verified = 1 และล้าง Token)
+    static async setVerified(userId) {
+        const sql = `UPDATE user SET is_verified = 1, verification_token = NULL, token_expires_at = NULL WHERE user_id = ?`;
+        const [result] = await db.execute(sql, [userId]);
+        return result;
     }
 }
 

@@ -18,7 +18,15 @@ export const api = {
         return data;
     },
 
-    // 2. เข้าสู่ระบบ (Login)
+    // 2. ยืนยันอีเมลผ่าน Token จากลิงก์ในอีเมล (Verify Email)
+    async verifyEmail(token) {
+        const res = await fetch(`${API_BASE}/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'ยืนยันอีเมลไม่สำเร็จ');
+        return data;
+    },
+
+    // 3. เข้าสู่ระบบ (Login)
     async login(email, password) {
         const res = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
@@ -30,7 +38,7 @@ export const api = {
         return data;
     },
 
-    // 3. ดึงโพสต์กิจกรรม (Get Posts / Search)
+    // 4. ดึงโพสต์กิจกรรม (Get Posts / Search)
     async getPosts(keyword = '', category = '') {
         const params = new URLSearchParams();
         if (keyword) params.append('keyword', keyword);
@@ -41,7 +49,7 @@ export const api = {
         return await res.json();
     },
 
-    // 4. สร้างโพสต์กิจกรรม (Create Post)
+    // 5. สร้างโพสต์กิจกรรม (Create Post)
     async createPost(postData) {
         const res = await fetch(`${API_BASE}/api/posts`, {
             method: 'POST',
@@ -56,7 +64,7 @@ export const api = {
         return data;
     },
 
-    // 5. ส่งคำขอเข้าร่วมกิจกรรม (Send Join Request)
+    // 6. ส่งคำขอเข้าร่วมกิจกรรม (Send Join Request)
     async sendRequest(postId) {
         const res = await fetch(`${API_BASE}/api/requests`, {
             method: 'POST',
@@ -71,7 +79,7 @@ export const api = {
         return data;
     },
 
-    // 6. ดึงคำขอของโพสต์ที่เราเป็น Host (แก้ไขจุดบั๊กข้อความซ้ำซ้อน และป้องกัน undefined)
+    // 7. ดึงคำขอของโพสต์ที่เราเป็น Host (แก้ไขจุดบั๊กข้อความซ้ำซ้อน และป้องกัน undefined)
     async getMyRequests() {
         const user = JSON.parse(localStorage.getItem('user'));
         if (!user) return [];
@@ -117,7 +125,7 @@ export const api = {
         }
     },
 
-    // 7. อนุมัติ / ปฏิเสธคำขอ (Respond Request)
+    // 8. อนุมัติ / ปฏิเสธคำขอ (Respond Request)
     async respondRequest(requestId, status) {
         const res = await fetch(`${API_BASE}/api/requests/${requestId}/status`, {
             method: 'PATCH',
@@ -132,7 +140,7 @@ export const api = {
         return data;
     },
 
-    // 8. ดึงประวัติข้อความแชท (Get Chat Messages)
+    // 9. ดึงประวัติข้อความแชท (Get Chat Messages)
     async getChatMessages(requestId) {
         const res = await fetch(`${API_BASE}/api/chats/${requestId}`, {
             headers: getAuthHeader()
@@ -141,7 +149,7 @@ export const api = {
         return await res.json();
     },
 
-    // 9. ส่งข้อความแชท (Send Message / Location Sharing)
+    // 10. ส่งข้อความแชท (Send Message / Location Sharing)
     async sendMessage(requestId, receiverId, content, isLocation = false) {
         const res = await fetch(`${API_BASE}/api/chats`, {
             method: 'POST',

@@ -5,7 +5,8 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 
 router.post('/register', authController.register);
-router.post('/verify-email', authController.verifyEmail);
+router.get('/verify-email', authController.verifyEmail);   // ลิงก์จากอีเมล: ?token=...
+router.post('/verify-email', authController.verifyEmail);  // ยืนยันผ่าน JSON body
 router.post('/login', authController.login);
 
 module.exports = router;

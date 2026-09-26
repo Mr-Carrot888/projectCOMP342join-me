@@ -98,3 +98,17 @@ CREATE TABLE IF NOT EXISTS user_report (
     FOREIGN KEY (reporter_id) REFERENCES user(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (reported_user_id) REFERENCES user(user_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==========================================
+-- 9. เพิ่มคอลัมน์สำหรับระบบยืนยันตัวตนทางอีเมล (Email Verification)
+--    รันเฉพาะกรณีฐานข้อมูลเดิมที่ยังไม่มีคอลัมน์เหล่านี้
+-- ==========================================
+ALTER TABLE `user`
+    ADD COLUMN IF NOT EXISTS `verification_token` VARCHAR(255) NULL COMMENT 'Token สำหรับยืนยันอีเมล',
+    ADD COLUMN IF NOT EXISTS `token_expires_at` DATETIME NULL COMMENT 'วันเวลาหมดอายุของ Token (15 นาที)';
+
+-- หาก MySQL รุ่นเก่า (ต่ำกว่า 8.0.29 / MariaDB) ไม่รองรับ ADD COLUMN IF NOT EXISTS
+-- ให้รันคำสั่งด้านล่างแทน (จะ Error ซ้ำได้หากคอลัมน์มีอยู่แล้ว ให้ข้ามไป):
+-- ALTER TABLE `user`
+--     ADD COLUMN `verification_token` VARCHAR(255) NULL,
+--     ADD COLUMN `token_expires_at` DATETIME NULL;
