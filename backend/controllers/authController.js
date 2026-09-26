@@ -19,6 +19,41 @@ const isAnnualVerificationExpired = (user) => {
     return elapsedMs > REVERIFICATION_DAYS * 24 * 60 * 60 * 1000;
 };
 
+// เช็คว่า Token ยืนยันชุดปัจจุบันยังใช้ได้อยู่ (ยังไม่หมดอายุ)
+const hasValidVerificationToken = (user) => {
+    return !!(user.verification_token && user.token_expires_at && new Date(user.token_expires_at) > new Date());
+};
+
+// เช็คว่าเป็น "สมัครใหม่ที่ไม่เคยยืนยันตัวตนเลย" และ Token หมดอายุแล้ว
+// (ลิงก์ยืนยันหมดอายุหรือไม่มีข้อมูล = ถือว่าหมดอายุ) → ลบทิ้งได้เพื่อเปิดทางสมัครใหม่
+// หมายเหตุ: ใช้เฉพาะใน register — การลบบัญชีผู้ใช้เก่าที่ครบกำหนดประจำปีเกิดเฉพาะตอน
+// กดลิงก์หมดอายุใน verifyEmail เท่านั้น (กันคนอื่นแอบอ้างอีเมลเพื่อลบบัญชีผู้ใช้จริงทาง register)
+const isStaleUnverifiedSignup = (user) => {
+    if (!user) return false;
+    const tokenExpired = !user.token_expires_at || new Date(user.token_expires_at) <= new Date();
+    return !user.is_verified && !user.last_verified_at && tokenExpired;
+};
+
+// สร้าง Token ใหม่ + ส่งอีเมลยืนยันซ้ำประจำปี แล้วตอบ 403 กลับไป
+// (ใช้ทั้งกรณีครบกำหนด 1 ปีพอดี และกรณีผู้ใช้กดลิงก์เดิมไม่ทันจน Token หมดอายุ)
+const resendAnnualVerification = async (res, user) => {
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ชั่วโมง
+
+    await User.revokeForReverification(user.user_id, newToken, tokenExpiresAt);
+
+    try {
+        await sendVerificationEmail(user.email, user.name, newToken, true); // true = อีเมลยืนยันซ้ำประจำปี
+    } catch (mailErr) {
+        console.error('ส่งอีเมลยืนยันซ้ำประจำปีไม่สำเร็จ:', mailErr.message);
+    }
+
+    return res.status(403).json({
+        message: 'การยืนยันตัวตนประจำปีหมดอายุ ระบบได้ส่งลิงก์ยืนยันไปที่อีเมลของคุณอีกครั้งแล้ว',
+        reason: 'annual_reverification'
+    });
+};
+
 // 1. สมัครสมาชิก (Register)
 exports.register = async (req, res) => {
     try {
@@ -35,9 +70,16 @@ exports.register = async (req, res) => {
         }
 
         // เช็กอีเมลซ้ำ
+        // - บัญชีที่ไม่เคยยืนยันตัวตนเลย (is_verified = 0, last_verified_at = NULL) และ Token หมดอายุแล้ว
+        //   → ลบข้อมูลสมัครเก่าทิ้งอัตโนมัติ แล้วเปิดทางให้สมัครใหม่ต่อได้เลย
+        // - บัญชีที่ยืนยันแล้ว (is_verified = 1) → แจ้งเตือนตามปกติ
         const existingUser = await User.findByEmail(email);
         if (existingUser) {
-            return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานในระบบแล้ว' });
+            if (isStaleUnverifiedSignup(existingUser)) {
+                await User.deleteById(existingUser.user_id); // ลบสมัครเก่าที่ไม่เคยยืนยัน เพื่อให้สมัครใหม่ได้
+            } else {
+                return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานในระบบแล้ว' });
+            }
         }
 
         // เข้ารหัสรหัสผ่าน
@@ -49,7 +91,10 @@ exports.register = async (req, res) => {
         const tokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 นาที
 
         // บันทึกลงฐานข้อมูล (is_verified = 0 รอยืนยันอีเมลก่อน)
-        await User.create({
+        // กรณีรหัสนักศึกษา (user_id) ซ้ำ เช่น สมัครผิดอีเมลแล้วกลับมาสมัครใหม่ด้วยรหัสเดิม:
+        // - ถ้าเป็นสมัครเก่าที่ไม่เคยยืนยันและ Token หมดอายุ → ลบทิ้งแล้วสร้างใหม่ให้เลย
+        // - ถ้าเป็นบัญชีที่ยืนยันแล้วหรือ Token ยังใช้ได้ → แจ้งเตือนตามปกติ
+        const newUserData = {
             user_id,
             email,
             password_hash,
@@ -58,7 +103,23 @@ exports.register = async (req, res) => {
             status: 'Active',
             verification_token: verificationToken,
             token_expires_at: tokenExpiresAt
-        });
+        };
+
+        try {
+            await User.create(newUserData);
+        } catch (createErr) {
+            if (createErr && createErr.code === 'ER_DUP_ENTRY') {
+                const dupById = await User.findById(user_id);
+                if (isStaleUnverifiedSignup(dupById)) {
+                    await User.deleteById(dupById.user_id);
+                    await User.create(newUserData);
+                } else {
+                    return res.status(400).json({ message: 'รหัสนักศึกษานี้ถูกใช้งานในระบบแล้ว' });
+                }
+            } else {
+                throw createErr;
+            }
+        }
 
         // ส่งอีเมลยืนยันตัวตน
         try {
@@ -99,7 +160,13 @@ exports.verifyEmail = async (req, res) => {
         // เช็คว่า Token หมดอายุหรือยัง (15 นาที)
         const now = new Date();
         if (user.token_expires_at && new Date(user.token_expires_at) < now) {
-            return res.status(400).json({ message: 'ลิงก์ยืนยันหมดอายุแล้ว กรุณาสมัครใหม่อีกครั้ง' });
+            // ลบบัญชีทันที "ทุกกรณี" ที่กดลิงก์ช้า ทั้งผู้สมัครใหม่
+            // และผู้ใช้เก่าที่ถึงรอบ Re-verification ประจำปี (มี last_verified_at แล้ว)
+            // หมายเหตุ: โพสต์/คำขอ/แชทที่ผูกกับบัญชีนี้จะถูกลบตามไปด้วย (ON DELETE CASCADE)
+            await User.deleteById(user.user_id);
+            return res.status(400).json({
+                message: 'ลิงก์ยืนยันตัวตนหมดอายุแล้ว ระบบได้ทำการยกเลิกและลบบัญชีของคุณเรียบร้อยแล้ว หากต้องการใช้งานกรุณาสมัครใหม่อีกครั้ง'
+            });
         }
 
         // Token ถูกต้อง: is_verified = true และล้าง Token
@@ -132,27 +199,25 @@ exports.login = async (req, res) => {
 
         // เช็คว่ายืนยันอีเมลแล้วหรือยัง (is_verified เป็น false/0 → ห้ามเข้าใช้งาน)
         if (!user.is_verified) {
+            // กรณียืนยันประจำปีหมดอายุแล้วผู้ใช้กดลิงก์ไม่ทัน (Token หมดอายุหรือไม่มี)
+            // → ส่งลิงก์ใหม่ให้อัตโนมัติทุกครั้งที่พยายามล็อกอิน เพื่อไม่ให้ผู้ใช้ติดอยู่ (บัญชีไม่ถูกลบ)
+            if (isAnnualVerificationExpired(user)) {
+                if (!hasValidVerificationToken(user)) {
+                    return await resendAnnualVerification(res, user);
+                }
+                // Token ยังใช้ได้อยู่ → ไม่ส่งเมลซ้ำ (กันสแปม) แต่แจ้งสาเหตุประจำปีให้ผู้ใช้ทราบ
+                return res.status(403).json({
+                    message: 'การยืนยันตัวตนประจำปีหมดอายุ กรุณากดลิงก์ยืนยันในอีเมลที่ระบบส่งให้ก่อนหน้านี้',
+                    reason: 'annual_reverification'
+                });
+            }
             return res.status(403).json({ message: 'กรุณายืนยันอีเมลก่อนเข้าใช้งาน' });
         }
 
         // เช็คการยืนยันตัวตนประจำปี (Annual Re-verification)
         // ถ้า last_verified_at เกิน 365 วัน → ปรับ is_verified = 0, ส่ง token/ลิงก์ใหม่ทางอีเมลอัตโนมัติ
         if (isAnnualVerificationExpired(user)) {
-            const newToken = crypto.randomBytes(32).toString('hex');
-            const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ชั่วโมง
-
-            await User.revokeForReverification(user.user_id, newToken, tokenExpiresAt);
-
-            try {
-                await sendVerificationEmail(user.email, user.name, newToken, true); // true = อีเมลยืนยันซ้ำประจำปี
-            } catch (mailErr) {
-                console.error('ส่งอีเมลยืนยันซ้ำประจำปีไม่สำเร็จ:', mailErr.message);
-            }
-
-            return res.status(403).json({
-                message: 'การยืนยันตัวตนประจำปีหมดอายุ ระบบได้ส่งลิงก์ยืนยันไปที่อีเมลของคุณอีกครั้งแล้ว',
-                reason: 'annual_reverification'
-            });
+            return await resendAnnualVerification(res, user);
         }
 
         // สร้าง JWT Token

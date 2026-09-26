@@ -67,6 +67,21 @@ class User {
         const [result] = await db.execute(sql, [token, expiresAt, userId]);
         return result;
     }
+
+    // 9. ลบผู้ใช้ด้วย ID (ใช้ยกเลิกการสมัครของบัญชีที่ไม่เคยยืนยันตัวตน)
+    //    หมายเหตุ: โพสต์/คำขอ/แชทที่ผูกกับ user_id นี้จะถูกลบตามด้วย (ON DELETE CASCADE)
+    static async deleteById(userId) {
+        const sql = `DELETE FROM user WHERE user_id = ?`;
+        const [result] = await db.execute(sql, [userId]);
+        return result;
+    }
+
+    // 10. ลบผู้ใช้ด้วยอีเมล
+    static async deleteByEmail(email) {
+        const sql = `DELETE FROM user WHERE email = ?`;
+        const [result] = await db.execute(sql, [email]);
+        return result;
+    }
 }
 
 module.exports = User;
