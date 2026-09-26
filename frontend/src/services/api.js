@@ -34,7 +34,11 @@ export const api = {
             body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'เข้าสู่ระบบไม่สำเร็จ');
+        if (!res.ok) {
+            const err = new Error(data.message || 'เข้าสู่ระบบไม่สำเร็จ');
+            err.reason = data.reason; // เช่น 'annual_reverification' → ให้หน้าเว็บแสดงกล่องแจ้งเตือนที่ถูกต้อง
+            throw err;
+        }
         return data;
     },
 

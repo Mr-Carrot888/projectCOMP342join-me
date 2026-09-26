@@ -54,10 +54,17 @@ class User {
         return rows[0];
     }
 
-    // 7. ยืนยันอีเมลสำเร็จ (is_verified = 1 และล้าง Token)
+    // 7. ยืนยันอีเมลสำเร็จ (is_verified = 1 + บันทึกเวลาที่ยืนยันล่าสุด + ล้าง Token)
     static async setVerified(userId) {
-        const sql = `UPDATE user SET is_verified = 1, verification_token = NULL, token_expires_at = NULL WHERE user_id = ?`;
+        const sql = `UPDATE user SET is_verified = 1, verification_token = NULL, token_expires_at = NULL, last_verified_at = NOW() WHERE user_id = ?`;
         const [result] = await db.execute(sql, [userId]);
+        return result;
+    }
+
+    // 8. รีเซ็ตสถานะสำหรับการยืนยันตัวตนซ้ำประจำปี (is_verified = 0 + token ชุดใหม่)
+    static async revokeForReverification(userId, token, expiresAt) {
+        const sql = `UPDATE user SET is_verified = 0, verification_token = ?, token_expires_at = ? WHERE user_id = ?`;
+        const [result] = await db.execute(sql, [token, expiresAt, userId]);
         return result;
     }
 }

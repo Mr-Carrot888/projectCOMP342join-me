@@ -417,6 +417,19 @@ body.auth-mode .auth-wrapper {
 }
 .verify-notice b { color: var(--tag-orange); }
 
+/* กล่องแจ้งเตือน "ยืนยันตัวตนประจำปีหมดอายุ" บนหน้า Login */
+.reverify-notice {
+  background: rgba(200, 90, 43, 0.15);
+  border: 1.5px solid var(--tag-orange);
+  border-radius: 16px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  display: none;
+}
+.reverify-notice b { color: var(--tag-orange); }
+
 /* หน้ายืนยันอีเมล (Verify Email Result) */
 .verify-box { text-align: center; }
 .verify-icon {
@@ -484,7 +497,11 @@ body.auth-mode .auth-wrapper {
         <div id="loginFormContainer">
           <div class="verify-notice" id="verifyNotice">
             <b>⚠ กรุณายืนยันอีเมลก่อนเข้าใช้งาน</b><br>
-            เราได้ส่งลิงก์ยืนยันไปที่กล่องจดหมายของคุณแล้ว (ลิงก์มีอายุ 15 นาที)
+            เราได้ส่งลิงก์ยืนยันไปที่กล่องจดหมายของคุณแล้ว (ลิงก์มีอายุ 24 ชั่วโมง)
+          </div>
+          <div class="reverify-notice" id="reverifyNotice">
+            <b>🎓 การยืนยันตัวตนประจำปีหมดอายุ</b><br>
+            เพื่อความปลอดภัยและการคัดกรองนักศึกษาที่พ้นสภาพ ระบบได้ส่งลิงก์ยืนยันใหม่ไปที่อีเมลของคุณแล้ว (ลิงก์มีอายุ 15 นาที) กรุณากดลิงก์ในอีเมลเพื่อยืนยันตัวตนอีกครั้ง
           </div>
           <form id="loginForm">
             <label class="f-label">อีเมลมหาวิทยาลัย</label>
@@ -851,6 +868,7 @@ body.auth-mode .auth-wrapper {
       tabRegisterBtn.classList.remove('active');
       loginFormContainer.style.display = 'block';
       registerFormContainer.style.display = 'none';
+      document.getElementById('reverifyNotice').style.display = 'none';
     }
 
     function showRegisterTab() {
@@ -910,6 +928,10 @@ body.auth-mode .auth-wrapper {
         // กรณียังไม่ยืนยันอีเมล → แสดงกล่องแจ้งเตือนบนหน้า Login
         if (err.message.includes('ยืนยันอีเมล')) {
           document.getElementById('verifyNotice').style.display = 'block';
+        }
+        // กรณีการยืนยันตัวตนประจำปีหมดอายุ (Annual Re-verification) → แสดงกล่องแจ้งเตือนสีส้มเฉพาะ
+        if (err.reason === 'annual_reverification') {
+          document.getElementById('reverifyNotice').style.display = 'block';
         }
         toast(err.message);
       }

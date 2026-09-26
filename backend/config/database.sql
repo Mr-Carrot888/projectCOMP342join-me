@@ -105,10 +105,12 @@ CREATE TABLE IF NOT EXISTS user_report (
 -- ==========================================
 ALTER TABLE `user`
     ADD COLUMN IF NOT EXISTS `verification_token` VARCHAR(255) NULL COMMENT 'Token สำหรับยืนยันอีเมล',
-    ADD COLUMN IF NOT EXISTS `token_expires_at` DATETIME NULL COMMENT 'วันเวลาหมดอายุของ Token (15 นาที)';
+    ADD COLUMN IF NOT EXISTS `token_expires_at` DATETIME NULL COMMENT 'วันเวลาหมดอายุของ Token (15 นาที)',
+    ADD COLUMN IF NOT EXISTS `last_verified_at` DATETIME NULL COMMENT 'วันเวลาที่ยืนยันตัวตนครั้งล่าสุด (ใช้นับรอบยืนยันซ้ำประจำปี)';
 
 -- หาก MySQL รุ่นเก่า (ต่ำกว่า 8.0.29 / MariaDB) ไม่รองรับ ADD COLUMN IF NOT EXISTS
 -- ให้รันคำสั่งด้านล่างแทน (จะ Error ซ้ำได้หากคอลัมน์มีอยู่แล้ว ให้ข้ามไป):
 -- ALTER TABLE `user`
 --     ADD COLUMN `verification_token` VARCHAR(255) NULL,
---     ADD COLUMN `token_expires_at` DATETIME NULL;
+--     ADD COLUMN `token_expires_at` DATETIME NULL,
+--     ADD COLUMN `last_verified_at` DATETIME NULL;

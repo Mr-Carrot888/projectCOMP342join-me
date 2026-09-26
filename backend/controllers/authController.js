@@ -9,6 +9,16 @@ const { sendVerificationEmail } = require('../utils/mailer');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 
+// อายุการยืนยันตัวตนประจำปี (Annual Re-verification) = 365 วัน
+const REVERIFICATION_DAYS = 365;
+
+// เช็คว่าการยืนยันตัวตนหมดอายุประจำปีหรือยัง (last_verified_at เกิน 365 วัน)
+const isAnnualVerificationExpired = (user) => {
+    if (!user.last_verified_at) return false; // ไม่มีข้อมูล (ผู้ใช้เก่า) → ไม่บังคับยืนยันซ้ำ
+    const elapsedMs = Date.now() - new Date(user.last_verified_at).getTime();
+    return elapsedMs > REVERIFICATION_DAYS * 24 * 60 * 60 * 1000;
+};
+
 // 1. สมัครสมาชิก (Register)
 exports.register = async (req, res) => {
     try {
@@ -123,6 +133,26 @@ exports.login = async (req, res) => {
         // เช็คว่ายืนยันอีเมลแล้วหรือยัง (is_verified เป็น false/0 → ห้ามเข้าใช้งาน)
         if (!user.is_verified) {
             return res.status(403).json({ message: 'กรุณายืนยันอีเมลก่อนเข้าใช้งาน' });
+        }
+
+        // เช็คการยืนยันตัวตนประจำปี (Annual Re-verification)
+        // ถ้า last_verified_at เกิน 365 วัน → ปรับ is_verified = 0, ส่ง token/ลิงก์ใหม่ทางอีเมลอัตโนมัติ
+        if (isAnnualVerificationExpired(user)) {
+            const newToken = crypto.randomBytes(32).toString('hex');
+            const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ชั่วโมง
+
+            await User.revokeForReverification(user.user_id, newToken, tokenExpiresAt);
+
+            try {
+                await sendVerificationEmail(user.email, user.name, newToken, true); // true = อีเมลยืนยันซ้ำประจำปี
+            } catch (mailErr) {
+                console.error('ส่งอีเมลยืนยันซ้ำประจำปีไม่สำเร็จ:', mailErr.message);
+            }
+
+            return res.status(403).json({
+                message: 'การยืนยันตัวตนประจำปีหมดอายุ ระบบได้ส่งลิงก์ยืนยันไปที่อีเมลของคุณอีกครั้งแล้ว',
+                reason: 'annual_reverification'
+            });
         }
 
         // สร้าง JWT Token

@@ -15,24 +15,38 @@ const transporter = nodemailer.createTransport({
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
 
 // ส่งอีเมลยืนยันตัวตน (มีลิงก์ที่มี Token แนบไปทางอีเมลผู้สมัคร)
-exports.sendVerificationEmail = async (toEmail, name, token) => {
+// isRenewal = true → เป็นอีเมล "ยืนยันตัวตนซ้ำประจำปีการศึกษา" (Annual Re-verification)
+exports.sendVerificationEmail = async (toEmail, name, token, isRenewal = false) => {
     const verifyLink = `${FRONTEND_URL}/verify-email?token=${token}`;
+
+    const subject = isRenewal
+        ? 'ยืนยันตัวตนประจำปีการศึกษา — MakeFriend.PSRU'
+        : 'ยืนยันอีเมลของคุณ — MakeFriend.PSRU';
+
+    const introHtml = isRenewal
+        ? `
+                <p style="font-size: 15px; color: #0f2412;">
+                    เพื่อความปลอดภัยของบัญชีและการคัดกรองนักศึกษาที่พ้นสภาพ <b>MakeFriend.PSRU</b> กำหนดให้ยืนยันตัวตนซ้ำทุก 1 ปีการศึกษา<br>
+                    การยืนยันตัวตนของคุณหมดอายุแล้ว กรุณากดลิงก์ด้านล่างเพื่อยืนยันตัวตนอีกครั้ง
+                </p>`
+        : `
+                <p style="font-size: 15px; color: #0f2412;">
+                    ขอบคุณที่สมัครสมาชิก <b>MakeFriend.PSRU</b><br>
+                    กรุณากดลิงก์ด้านล่างเพื่อยืนยันอีเมลมหาวิทยาลัยของคุณ
+                </p>`;
 
     const mailOptions = {
         from: `"MakeFriend.PSRU" <${process.env.EMAIL_USER}>`,
         to: toEmail,
-        subject: 'ยืนยันอีเมลของคุณ — MakeFriend.PSRU',
+        subject,
         html: `
             <div style="font-family: 'IBM Plex Sans Thai', sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background: #f4f8f1; border-radius: 16px;">
                 <h2 style="color: #0a3010;">สวัสดีคุณ ${name}</h2>
-                <p style="font-size: 15px; color: #0f2412;">
-                    ขอบคุณที่สมัครสมาชิก <b>MakeFriend.PSRU</b><br>
-                    กรุณากดลิงก์ด้านล่างเพื่อยืนยันอีเมลมหาวิทยาลัยของคุณ
-                </p>
+                ${introHtml}
                 <p style="text-align: center; margin: 28px 0;">
                     <a href="${verifyLink}"
                        style="background: #0a3010; color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: bold;">
-                        ยืนยันอีเมล
+                        ${isRenewal ? 'ยืนยันตัวตนประจำปี' : 'ยืนยันอีเมล'}
                     </a>
                 </p>
                 <p style="font-size: 13px; color: #555;">
