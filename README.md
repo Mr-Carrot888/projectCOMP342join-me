@@ -21,6 +21,7 @@
 - **Database:** MySQL
 - **Authentication & Security:** JSON Web Token (JWT), bcryptjs, Nodemailer (Gmail App Passwords)
 ## 📁 โครงสร้างโปรเจกต์ (Project Structure)<br>
+```text
 .
 ├── README.md
 ├── backend
@@ -65,6 +66,7 @@
         ├── services
         │   └── api.js
         └── utils
+```
 
 ## 🚀 วิธีการติดตั้งและเริ่มต้นใช้งาน (Getting Started)<br>
 ### 1. การเตรียมฐานข้อมูล (Database Setup)
